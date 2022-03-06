@@ -1,0 +1,56 @@
+clear;
+clc;
+
+% Calculating cumNDVI based on accumulated temperature and Cropland Cover info
+
+path = 'E:/CN_MOD13A1R500m2000_2020/';
+
+tifpath = [path,'2000_2019ERA_SDT10_EDT10/SDT.tif'];%AAT10StartDate
+[SDT10,R] = geotiffread(tifpath);
+info = geotiffinfo(tifpath);
+EDT10 = geotiffread([path,'2000_2019ERA_SDT10_EDT10/EDT.tif']); %AAT10EndDate
+[nrows,ncols] = size(SDT10);
+
+
+for year = 2000:2020
+    %modis lucc only 2001-2018 accessible now
+    if year < 2001
+        year0 = 2001;
+    elseif year >2018
+        year0 = 2018;
+    else
+        year0 = year;
+    end % end if loop
+    CP = geotiffread(['CN_Y',num2str(year0),'MODlucc500m_reclassify.tif']); %cropland pixel
+    
+    cumNDVI = zeros(nrows,ncols);
+    cumNDVIcropland = zeros(nrows,ncols);
+    
+    for doy = 1:16:365
+        yd = year*1000+doy;
+        A = geotiffread([path,'A5_CNNDVI500mAlbers_tif/ndvi',num2str(yd),'mod13a1c006r500m16days_msg.tif']); %
+        A = double(A)/10000.0; %transfer data range [-1,1]
+        o = find( SDT10 <= doy & doy <= EDT10 & A > 0 );
+        cumNDVI(o) = cumNDVI(o) + A(o);
+        clear o;
+        disp(yd);
+    end %end doy loop
+    
+    o = find(CP == 1);
+    cumNDVIcropland(o) = cumNDVI(o);
+    clear o;
+    
+    outfile1 = ['For30kmChinaCumNDVI/ZcumNDVI',num2str(year),'.tif'];
+    geotiffwrite(outfile1,cumNDVI,R,'GeoKeyDirectoryTag', info.GeoTIFFTags.GeoKeyDirectoryTag);
+    outfile2 = ['For30kmChinaCumNDVI/ZcumNDVIcropland',num2str(year),'.tif'];
+    geotiffwrite(outfile2,cumNDVIcropland,R,'GeoKeyDirectoryTag', info.GeoTIFFTags.GeoKeyDirectoryTag);
+    
+end % end for loop
+
+
+fclose('all');
+
+
+
+
+
